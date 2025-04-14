@@ -11,29 +11,32 @@ async def send_mail_html(
     message: str,
     subject: str,
     receiver_email: str,
-    cc_email: str = [],
+    cc_email: list[str] = None,
 ):
     try:
-        smtp_server = SMTP_SERVER
-        port = SMTP_PORT
-        sender_email = SMTP_EMAIL
-        password = SMTP_PASS
+        smtp_server = "smtp.office365.com"
+        port = 587
+        sender_email = "msmohitsharma144@outlook.com"
+        password = SMTP_PASS  # Use an **App Password** if MFA is enabled
+
         email = EmailMessage()
         email["Subject"] = subject
         email["From"] = sender_email
         email["To"] = receiver_email
-        if len(cc_email) != 0:
-            email["cc"] = [mails.split(",") for mails in cc_email if mails][0]
+        if cc_email:
+            email["Cc"] = ", ".join(cc_email)
         email.set_content(message, subtype="html")
-        # Send the message via local SMTP server.
+
         client = SMTP(hostname=smtp_server, port=port, timeout=10, start_tls=True)
         await client.connect()
-        # await client.starttls()
-        # s.ehlo()  # Can be omitted, just added to ping smtp server before login
         await client.login(sender_email, password)
         await client.send_message(email)
+        await client.quit()
+
+        return {"message": "Email sent successfully", "status": 200}
+
     except Exception as e:
-        print(e)
+        print("EMAIL ERROR:", str(e))
         return {"message": str(e), "status": 400}
 
 

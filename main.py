@@ -3,8 +3,8 @@ from starlette.middleware.cors import CORSMiddleware
 from zstd_asgi import ZstdMiddleware
 
 from genric.api_route import generate_crud_routes
-from responses.auh import LoginResponse, RefreshTokenResponse, RegisterResponse, ResetPasswordResponse
-from schemas.auth import Login, RefreshToken, Register, ResetPassword
+from responses.auth import GoogleOauthCallbackResponse, GoogleOauthResponse, LoginResponse, RefreshTokenResponse, RegisterResponse, ResetPasswordResponse
+from schemas.auth import GoogleOauth, GoogleOauthCallback, Login, RefreshToken, Register, ResetPassword
 
 #
 # App
@@ -86,6 +86,34 @@ app.include_router(
         tags=["Auth"],
         include_read=False,
         include_read_all=False,
+        include_update=False,
+        include_delete=False,
+    )
+)
+
+app.include_router(
+    generate_crud_routes(
+        dto=GoogleOauth,
+        response_model=GoogleOauthResponse,
+        prefix="/google-oauth",
+        tags=["Auth"],
+        include_create=False,
+        include_read=False,
+        include_read_all=True,
+        include_update=False,
+        include_delete=False,
+    )
+)
+
+app.include_router(
+    generate_crud_routes(
+        dto=GoogleOauthCallback,
+        response_model=GoogleOauthCallbackResponse,
+        prefix="/google-oauth-callback",
+        tags=["Auth"],
+        include_create=False,
+        include_read=False,
+        include_read_all=True,
         include_update=False,
         include_delete=False,
     )

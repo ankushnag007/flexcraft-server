@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Type
 
 from bson import ObjectId
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 
@@ -24,31 +24,31 @@ def generate_crud_routes(
     if include_create:
 
         @router.post(f"{prefix}", response_model=Dict, tags=tags, include_in_schema=include_in_schema)
-        async def create_item(item: dto):
-            return await crud_service.create(item)
+        async def create_item(item: dto, request: Request):
+            return await crud_service.create(item, request)
 
     if include_read:
 
         @router.get(f"{prefix}/{{item_id}}", response_model=Dict | None, tags=tags, include_in_schema=include_in_schema)
-        async def get_item(item_id: ObjectId):
-            return await crud_service.read(item_id)
+        async def get_item(item_id: ObjectId, request: Request):
+            return await crud_service.read(item_id, request)
 
     if include_read_all:
 
         @router.get(f"{prefix}", response_model=List[Dict], tags=tags, include_in_schema=include_in_schema)
-        async def get_all_items():
-            return await crud_service.read_all()
+        async def get_all_items(request: Request):
+            return await crud_service.read_all(request)
 
     if include_update:
 
         @router.put(f"{prefix}/{{item_id}}", response_model=Dict | None, tags=tags, include_in_schema=include_in_schema)
-        async def update_item(item_id: ObjectId, item: dto):
-            return await crud_service.update(item_id, item)
+        async def update_item(item_id: ObjectId, item: dto, request: Request):
+            return await crud_service.update(item_id, item, request)
 
     if include_delete:
 
         @router.delete(f"{prefix}/{{item_id}}", response_model=Dict, tags=tags, include_in_schema=include_in_schema)
-        async def delete_item(item_id: ObjectId):
-            return await crud_service.delete(item_id)
+        async def delete_item(item_id: ObjectId, request: Request):
+            return await crud_service.delete(item_id, request)
 
     return router

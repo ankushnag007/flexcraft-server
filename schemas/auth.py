@@ -12,8 +12,11 @@ class Register(BaseModel):
     email: EmailStr = Field(..., min_length=5, max_length=128)
     password:SecretStr = Field(..., min_length=6, max_length=25)
     first_name: str = Field(..., min_length=2, max_length=50)
-    last_name: str = Field(..., min_length=2, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=2, max_length=50)
     role: Literal["user", "admin"] = Field("user")
+    is_google_login: bool = False
+    is_verified: bool = False
+    picture: Optional[str] = Field(None)
     created_at: datetime = Field(get_current_utc_datetime())
     updated_at: datetime = Field(get_current_utc_datetime())
 
@@ -36,7 +39,7 @@ class Register(BaseModel):
         json_encoders = {
             ObjectId: lambda v: str(v),
         }
-        allow_population_by_field_name = True
+        validate_by_name = True
         arbitrary_types_allowed = True
 
 
@@ -78,3 +81,32 @@ class ResetPassword(BaseModel):
         if not re.search(r"[@$!%*?&]", value):
             raise ValueError("Password must contain at least one special character (@$!%*?&).")
         return SecretStr(value)
+
+
+class GoogleOauth:
+    """
+    Schema for Google OAuth request.
+    """
+
+    ...
+
+
+class GoogleOauthCallback(BaseModel):
+    """
+    Schema for Google OAuth response.
+    """
+
+    ...
+
+
+class GoogleRegister(BaseModel):
+    email: EmailStr = Field(..., min_length=5, max_length=128)
+    password: None = Field(None)
+    first_name: str = Field(..., min_length=2, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=2, max_length=50)
+    role: Literal["user", "admin"] = Field("user")
+    picture: Optional[str] = Field(None)
+    is_google_login: bool = Field(True)
+    is_verified: bool = Field(True)
+    created_at: datetime = Field(get_current_utc_datetime())
+    updated_at: datetime = Field(get_current_utc_datetime())

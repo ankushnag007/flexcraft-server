@@ -1,15 +1,19 @@
-from fastapi import HTTPException
-from fastapi.responses import JSONResponse
+import json
+
+import httpx
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError, jwt
 from pydantic import SecretStr
 
 # from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from requests_oauthlib import OAuth2Session
 
 from constants.common import ExceptionType
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
-from schemas.auth import Login, RefreshToken, Register, ResetPassword
+from schemas.auth import GoogleRegister, Login, RefreshToken, Register, ResetPassword
 from services.authentication import create_access_token, create_refresh_token, verify_token
 from services.email import send_mail_html
 
@@ -17,7 +21,7 @@ from . import user_collection
 
 
 class RegisterResponse:
-    async def create(self, register_dto: Register):
+    async def create(self, register_dto: Register, request: Request):
         try:
             register_info_dict = register_dto.model_dump()
             passwd_hash = PasswordCipher.encrypt_password(register_info_dict["password"].get_secret_value())
@@ -47,7 +51,7 @@ class RegisterResponse:
     )
     
 class LoginResponse:
-    async def create(self, login_dto: Login):
+    async def create(self, login_dto: Login, request: Request):
         try:
             login_info_dict = login_dto.model_dump()
             user = user_collection.find_one({"email": login_info_dict["email"]})
@@ -75,7 +79,7 @@ class LoginResponse:
     
 
 class RefreshTokenResponse:
-    async def create(self, refresh_token: RefreshToken):
+    async def create(self, refresh_token: RefreshToken, request: Request):
         try:
             payload = verify_token(refresh_token.refresh_token, expected_type="refresh")
             if not payload: 
@@ -97,7 +101,7 @@ class RefreshTokenResponse:
 
 
 class ResetPasswordResponse:
-    def create(self, reset_password_dto: ResetPassword):
+    async def create(self, reset_password_dto: ResetPassword, request: Request):
         try:
             reset_password_info_dict = reset_password_dto.model_dump()
             user = user_collection.find_one({"email": reset_password_info_dict["email"]})
@@ -116,5 +120,84 @@ class ResetPasswordResponse:
                     "message": "user password updated successfully!",
                 },
             )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": str(e)})
+
+
+class GoogleOauthResponse:
+    async def read_all(self, request: Request):
+        client_id = "540104557426-8u2radldii80dlcou7k4irvl3m59de80.apps.googleusercontent.com"
+        authorization_base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+        scope = [
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ]
+
+        redirect_uri = "http://127.0.0.1:8000/google-oauth-callback"
+        google = OAuth2Session(client_id, scope=scope, redirect_uri=redirect_uri)
+        authorization_url, _ = google.authorization_url(authorization_base_url, access_type="offline", prompt="select_account")
+        return RedirectResponse(authorization_url)
+
+
+class GoogleOauthCallbackResponse:
+    async def read_all(self, request: Request):
+        try:
+            client_id = "540104557426-8u2radldii80dlcou7k4irvl3m59de80.apps.googleusercontent.com"
+            client_secret = "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"
+            token_url = "https://www.googleapis.com/oauth2/v4/token"
+            redirect_uri = "http://127.0.0.1:8000/google-oauth-callback"
+            if "code" in request.query_params:
+                code = request.query_params["code"]
+                async with httpx.AsyncClient() as client:
+                    token_response = await client.post(
+                        token_url,
+                        data={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "code": code,
+                            "redirect_uri": redirect_uri,
+                            "grant_type": "authorization_code",
+                        },
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    )
+
+                    token_data = token_response.json()
+                    access_token = token_data.get("access_token")
+
+                    # Fetch user info using the access token
+                    user_info_response = await client.get(
+                        "https://www.googleapis.com/oauth2/v1/userinfo",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+                    user_info = user_info_response.json()
+                    if user_info.get("error"):
+                        raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": user_info["error"]})
+                    user_info_dict = {
+                        "email": user_info.get("email"),
+                        "first_name": user_info.get("given_name"),
+                        "last_name": user_info.get("family_name"),
+                        "picture": user_info.get("picture"),
+                        "is_google_login": True,
+                        "is_verified": user_info.get("verified_email", False),
+                    }
+                    registration_info = GoogleRegister(**user_info_dict)
+                    registration_info_dict = registration_info.model_dump()
+                    user_collection.insert_one(registration_info_dict)
+                    access_token = create_access_token({"sub": str(registration_info_dict["_id"])})
+                    refresh_token = create_refresh_token({"sub": str(registration_info_dict["_id"])})
+
+                    return JSONResponse(
+                        status_code=201,
+                        content={
+                            "type": ExceptionType.SUCCESS,
+                            "message": "user created successfully!",
+                            "data": custom_jsonable_encoder(registration_info_dict),
+                            "refresh_token": refresh_token,
+                            "access_token": access_token,
+                            "token_type": "bearer",
+                        },
+                    )
+
         except Exception as e:
             raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": str(e)})
