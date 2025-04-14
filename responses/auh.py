@@ -9,14 +9,15 @@ from pymongo.errors import DuplicateKeyError
 from constants.common import ExceptionType
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
-from schemas.auth import ForgotPassword, Login, RefreshToken, Register
+from schemas.auth import Login, RefreshToken, Register, ResetPassword
 from services.authentication import create_access_token, create_refresh_token, verify_token
+from services.email import send_mail_html
 
 from . import user_collection
 
 
 class RegisterResponse:
-    def create(self, register_dto: Register):
+    async def create(self, register_dto: Register):
         try:
             register_info_dict = register_dto.model_dump()
             passwd_hash = PasswordCipher.encrypt_password(register_info_dict["password"].get_secret_value())
@@ -46,7 +47,7 @@ class RegisterResponse:
     )
     
 class LoginResponse:
-    def create(self, login_dto: Login):
+    async def create(self, login_dto: Login):
         try:
             login_info_dict = login_dto.model_dump()
             user = user_collection.find_one({"email": login_info_dict["email"]})
@@ -74,7 +75,7 @@ class LoginResponse:
     
 
 class RefreshTokenResponse:
-    def create(self, refresh_token: RefreshToken):
+    async def create(self, refresh_token: RefreshToken):
         try:
             payload = verify_token(refresh_token.refresh_token, expected_type="refresh")
             if not payload: 
@@ -95,19 +96,19 @@ class RefreshTokenResponse:
             })
 
 
-class ForgotPasswordResponse:
-    def create(self, forgot_password_dto: ForgotPassword):
+class ResetPasswordResponse:
+    def create(self, reset_password_dto: ResetPassword):
         try:
-            forgot_password_info_dict = forgot_password_dto.model_dump()
-            user = user_collection.find_one({"email": forgot_password_info_dict["email"]})
+            reset_password_info_dict = reset_password_dto.model_dump()
+            user = user_collection.find_one({"email": reset_password_info_dict["email"]})
             if not user:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            if PasswordCipher.decrypt_password(user["password"]) != forgot_password_info_dict["old_password"].get_secret_value():
+            if PasswordCipher.decrypt_password(user["password"]) != reset_password_info_dict["old_password"].get_secret_value():
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            if forgot_password_info_dict["new_password"].get_secret_value() != forgot_password_info_dict["confirm_password"].get_secret_value():
+            if reset_password_info_dict["new_password"].get_secret_value() != reset_password_info_dict["confirm_password"].get_secret_value():
                 raise HTTPException(status_code=401, detail="New and confirm password not matching")
-            new_passwd_hash = PasswordCipher.encrypt_password(forgot_password_info_dict["new_password"].get_secret_value())
-            user_collection.update_one({"email": forgot_password_info_dict["email"]}, {"$set": {"password": new_passwd_hash}})
+            new_passwd_hash = PasswordCipher.encrypt_password(reset_password_info_dict["new_password"].get_secret_value())
+            user_collection.update_one({"email": reset_password_info_dict["email"]}, {"$set": {"password": new_passwd_hash}})
             return JSONResponse(
                 status_code=200,
                 content={

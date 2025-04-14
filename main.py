@@ -3,8 +3,8 @@ from starlette.middleware.cors import CORSMiddleware
 from zstd_asgi import ZstdMiddleware
 
 from genric.api_route import generate_crud_routes
-from responses.auh import ForgotPasswordResponse, LoginResponse, RefreshTokenResponse, RegisterResponse
-from schemas.auth import ForgotPassword, Login, RefreshToken, Register
+from responses.auh import LoginResponse, RefreshTokenResponse, RegisterResponse, ResetPasswordResponse
+from schemas.auth import Login, RefreshToken, Register, ResetPassword
 
 #
 # App
@@ -80,9 +80,9 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=ForgotPassword,
-        response_model=ForgotPasswordResponse,
-        prefix="/forgot-password",
+        dto=ResetPassword,
+        response_model=ResetPasswordResponse,
+        prefix="/reset-password",
         tags=["Auth"],
         include_read=False,
         include_read_all=False,

@@ -24,31 +24,31 @@ def generate_crud_routes(
     if include_create:
 
         @router.post(f"{prefix}", response_model=Dict, tags=tags, include_in_schema=include_in_schema)
-        def create_item(item: dto):
-            return crud_service.create(item)
+        async def create_item(item: dto):
+            return await crud_service.create(item)
 
     if include_read:
 
         @router.get(f"{prefix}/{{item_id}}", response_model=Dict | None, tags=tags, include_in_schema=include_in_schema)
-        def get_item(item_id: ObjectId):
-            return crud_service.read(item_id)
+        async def get_item(item_id: ObjectId):
+            return await crud_service.read(item_id)
 
     if include_read_all:
 
         @router.get(f"{prefix}", response_model=List[Dict], tags=tags, include_in_schema=include_in_schema)
-        def get_all_items():
-            return crud_service.read_all()
+        async def get_all_items():
+            return await crud_service.read_all()
 
     if include_update:
 
         @router.put(f"{prefix}/{{item_id}}", response_model=Dict | None, tags=tags, include_in_schema=include_in_schema)
-        def update_item(item_id: ObjectId, item: dto):
-            return crud_service.update(item_id, item)
+        async def update_item(item_id: ObjectId, item: dto):
+            return await crud_service.update(item_id, item)
 
     if include_delete:
 
         @router.delete(f"{prefix}/{{item_id}}", response_model=Dict, tags=tags, include_in_schema=include_in_schema)
-        def delete_item(item_id: ObjectId):
-            return crud_service.delete(item_id)
+        async def delete_item(item_id: ObjectId):
+            return await crud_service.delete(item_id)
 
     return router

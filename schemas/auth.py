@@ -54,9 +54,9 @@ class RefreshToken(BaseModel):
     refresh_token: str
 
 
-class ForgotPassword(BaseModel):
+class ResetPassword(BaseModel):
     """
-    Schema for forgot password request.
+    Schema for Reset password request.
     """
 
     email: EmailStr = Field(..., min_length=5, max_length=128)
