@@ -52,3 +52,29 @@ class RefreshToken(BaseModel):
     Schema for refresh token request.
     """
     refresh_token: str
+
+
+class ForgotPassword(BaseModel):
+    """
+    Schema for forgot password request.
+    """
+
+    email: EmailStr = Field(..., min_length=5, max_length=128)
+    old_password: SecretStr = Field(..., min_length=6, max_length=25)
+    new_password: SecretStr = Field(..., min_length=6, max_length=25)
+    confirm_password: SecretStr = Field(..., min_length=6, max_length=25)
+
+    @field_validator("new_password")
+    def validate_password(cls, value):
+        value = value.get_secret_value()
+        if len(value) < 6:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not re.search(r"[A-Z]", value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one digit.")
+        if not re.search(r"[@$!%*?&]", value):
+            raise ValueError("Password must contain at least one special character (@$!%*?&).")
+        return SecretStr(value)

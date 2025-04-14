@@ -9,7 +9,7 @@ from pymongo.errors import DuplicateKeyError
 from constants.common import ExceptionType
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
-from schemas.auth import Login, RefreshToken, Register
+from schemas.auth import ForgotPassword, Login, RefreshToken, Register
 from services.authentication import create_access_token, create_refresh_token, verify_token
 
 from . import user_collection
@@ -52,7 +52,7 @@ class LoginResponse:
             user = user_collection.find_one({"email": login_info_dict["email"]})
             if not user:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            if not PasswordCipher.decrypt_password(user["password"]) == login_info_dict["password"].get_secret_value():
+            if PasswordCipher.decrypt_password(user["password"]) != login_info_dict["password"].get_secret_value():
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             access_token = create_access_token({"sub": str(user["_id"])})
             refresh_token = create_refresh_token({"sub": str(user["_id"])})
@@ -93,3 +93,27 @@ class RefreshTokenResponse:
                 "type": ExceptionType.API,
                 "message": str(e)
             })
+
+
+class ForgotPasswordResponse:
+    def create(self, forgot_password_dto: ForgotPassword):
+        try:
+            forgot_password_info_dict = forgot_password_dto.model_dump()
+            user = user_collection.find_one({"email": forgot_password_info_dict["email"]})
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            if PasswordCipher.decrypt_password(user["password"]) != forgot_password_info_dict["old_password"].get_secret_value():
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            if forgot_password_info_dict["new_password"].get_secret_value() != forgot_password_info_dict["confirm_password"].get_secret_value():
+                raise HTTPException(status_code=401, detail="New and confirm password not matching")
+            new_passwd_hash = PasswordCipher.encrypt_password(forgot_password_info_dict["new_password"].get_secret_value())
+            user_collection.update_one({"email": forgot_password_info_dict["email"]}, {"$set": {"password": new_passwd_hash}})
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "type": ExceptionType.SUCCESS,
+                    "message": "user password updated successfully!",
+                },
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": str(e)})
