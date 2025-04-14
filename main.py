@@ -2,9 +2,9 @@ from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 from zstd_asgi import ZstdMiddleware
 
-from crypt.auth_utils import settings
-from middlewares.extract_request import RequestMiddleware
-from middlewares.file_validator_middleware import FileValidationMiddleware
+from genric.api_route import generate_crud_routes
+from responses.auh import LoginResponse, RefreshTokenResponse, RegisterResponse
+from schemas.auth import Login, RefreshToken, Register
 
 #
 # App
@@ -13,30 +13,13 @@ app = FastAPI(
     docs_url="/docs",
     swagger_ui_init_oauth={
         "appName": "Credentialing API",
-        "clientId": settings.client_id,
         "usePkceWithAuthorizationCodeGrant": True,
     },
 )
 
 origins = [
     "*"
-    # "https://app-staging.billimd.com",
-    # "http://localhost:3000",
-    # "http://localhost:45678",
-    # "http://127.0.0.1:45678",
-    # "https://dev-api.billimd.com",
-    # "https://app-dev.billimd.com",
-    # "https://admin-dev.billimd.com",
-    # "https://www-dev.billimd.com",
-    # "https://admin.billimd.com",
-    # "https://dev.d3bscz9pc3c2oq.amplifyapp.com",
-    # "https://app.billimd.com",
-    # "https://billimd.com",
-    # "https://www.billimd.com",
-    # "https://production.d1tvcjkuayvnda.amplifyapp.com",
-    # "https://development-v1-0.d1mkkwffns3cnn.amplifyapp.com",
-    # "https://dev.d3oanva89hwsuh.amplifyapp.com",
-    # "https://promo.billimd.com",
+    # "http://localhost:3000"
 ]
 
 
@@ -48,16 +31,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# app.add_middleware(
-#     ZstdMiddleware,
-#     minimum_size=500,
-#     write_checksum=True,
-#     write_content_size=True,
-#     gzip_fallback=True,
-# )
+app.add_middleware(
+    ZstdMiddleware,
+    minimum_size=500,
+    write_checksum=True,
+    write_content_size=True,
+    gzip_fallback=True,
+)
 
-app.add_middleware(RequestMiddleware)
-app.add_middleware(FileValidationMiddleware)
+app.include_router(
+    generate_crud_routes(
+        dto=Register,
+        response_model=RegisterResponse,
+        prefix="/register",
+        tags=["Auth"],
+        include_read=False,
+        include_read_all=False,
+        include_update=False,
+        include_delete=False,
+    )
+)
 
+app.include_router(
+    generate_crud_routes(
+        dto=Login,
+        response_model=LoginResponse,
+        prefix="/login",
+        tags=["Auth"],
+        include_read=False,
+        include_read_all=False,
+        include_update=False,
+        include_delete=False,
+    )
+)
 
-# init_auth_routes(app)
+app.include_router(
+    generate_crud_routes(
+        dto=RefreshToken,
+        response_model=RefreshTokenResponse,
+        prefix="/refresh-token",
+        tags=["Auth"],
+        include_read=False,
+        include_read_all=False,
+        include_update=False,
+        include_delete=False,
+    )
+)

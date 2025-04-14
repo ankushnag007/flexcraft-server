@@ -1,0 +1,30 @@
+from enum import Enum, StrEnum, unique
+
+
+@unique
+class ExceptionType(StrEnum):
+    API = "API Exception"
+    ARGUMENT = "INVALID_ARGUMENT"
+    DB_INSERTION = "DB Insertion Failure"
+    DB_DUPLICACY = "Duplicate Entity"
+    REQUEST_BODY = "Request Body Error"
+    REQUEST_HEADER = "Request Header Error"
+    REQUIRED_FIELD = "Required Field Error"
+    DATABASE_TIMEOUT = "DB Timed Out"
+    INVALID_DB_OPERATION = "Unsupported DB Operation"
+    DB_CLOSED = "DB Connection Closed"
+    DB = "DB Exceptions"
+    DB_OPERATION_FAILED = "DB Operation Failure"
+    COLLECTION_INVALID = "Invalid Collection Chosen"
+    DB_CONNECTION_FAILURE = "DB Connection Error"
+    DUPLICATE_KEY_ERROR = "Found Duplicate Key"
+    EMAIL_VALIDATION = "Email Validation Exception"
+    PHONE_VALIDATION = "Phone Number Validation Exception"
+    NOT_FOUND = "Not Found Exception"
+    TOKEN_INVALID = "Invalid Token"
+    TOKEN_EXPIRED = "Token Expired"
+    TOKEN_MISSING = "Token Missing"
+    TOKEN_ERROR = "Token Error"
+    REFRESH_TOKEN_ERROR = "Refresh Token Error"
+    ACCESS_DENIED_ERROR = "Access Denied Error"
+    SUCCESS = "Success"
