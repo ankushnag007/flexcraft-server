@@ -1,12 +1,8 @@
-import json
-
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError, jwt
 from pydantic import SecretStr
-
-# from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from requests_oauthlib import OAuth2Session
 

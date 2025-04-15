@@ -116,5 +116,6 @@ app.include_router(
         include_read_all=True,
         include_update=False,
         include_delete=False,
+        include_in_schema=False,
     )
 )

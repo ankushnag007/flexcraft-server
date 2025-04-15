@@ -14,10 +14,10 @@ async def send_mail_html(
     cc_email: list[str] = None,
 ):
     try:
-        smtp_server = "smtp.office365.com"
+        smtp_server = "smtp-mail.outlook.com"
         port = 587
-        sender_email = "msmohitsharma144@outlook.com"
-        password = SMTP_PASS  # Use an **App Password** if MFA is enabled
+        sender_email = "support@billimd.com"
+        password = "BilliMD123$"  # Use an **App Password** if MFA is enabled
 
         email = EmailMessage()
         email["Subject"] = subject
