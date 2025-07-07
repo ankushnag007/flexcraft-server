@@ -1,8 +1,8 @@
-from enum import Enum, StrEnum, unique
+from enum import Enum, unique
 
 
 @unique
-class ExceptionType(StrEnum):
+class ExceptionType(Enum):
     API = "API Exception"
     ARGUMENT = "INVALID_ARGUMENT"
     DB_INSERTION = "DB Insertion Failure"

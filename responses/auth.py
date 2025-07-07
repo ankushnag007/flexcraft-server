@@ -26,25 +26,21 @@ class RegisterResponse:
             register_info_dict["password"] = str(SecretStr(passwd_hash))
             access_token = create_access_token({"sub": str(register_info_dict["_id"])})
             refresh_token = create_refresh_token({"sub": str(register_info_dict["_id"])})
-            return JSONResponse(status_code=201, content={
-                "type": ExceptionType.SUCCESS,
-                "message": "user created successfully!",
-                "data": custom_jsonable_encoder(register_info_dict),
-                "refresh_token": refresh_token,
-                "access_token": access_token,
-                "token_type": "bearer"
-            })
+            return JSONResponse(
+                status_code=201,
+                content={
+                    "type": ExceptionType.SUCCESS.value,
+                    "message": "user created successfully!",
+                    "data": custom_jsonable_encoder(register_info_dict),
+                    "refresh_token": refresh_token,
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                },
+            )
         except DuplicateKeyError as e:
-            raise HTTPException(status_code=400, detail={
-                "type": ExceptionType.DB_DUPLICACY,
-                "message": str(e)
-            })
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.DB_DUPLICACY.value, "message": str(e)})
         except Exception as e:
-            raise HTTPException(status_code=400, detail={
-            "type": ExceptionType.API,
-            "message": str(e)
-        }
-    )
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": str(e)})
     
 class LoginResponse:
     async def create(self, login_dto: Login, request: Request):
@@ -60,7 +56,7 @@ class LoginResponse:
             return JSONResponse(
                 status_code=200,
                 content={
-                    "type": ExceptionType.SUCCESS,
+                    "type": ExceptionType.SUCCESS.value,
                     "message": "user login successfully!",
                     "access_token": access_token,
                     "refresh_token": refresh_token,
@@ -68,10 +64,7 @@ class LoginResponse:
                 },
             )
         except Exception as e:
-            raise HTTPException(status_code=400, detail={
-                "type": ExceptionType.API,
-                "message": str(e)
-            })
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": str(e)})
     
 
 class RefreshTokenResponse:
@@ -84,16 +77,13 @@ class RefreshTokenResponse:
             user_id = payload.get("sub")
             new_access_token = create_access_token({"sub": user_id})
             return JSONResponse(
-                status_code=201, content={"type": ExceptionType.SUCCESS, "message": "new token generated successfully!", "access_token": new_access_token, "token_type": "bearer"}
+                status_code=201,
+                content={"type": ExceptionType.SUCCESS.value, "message": "new token generated successfully!", "access_token": new_access_token, "token_type": "bearer"},
             ) 
         except JWTError:
-            raise HTTPException(status_code=401, detail={"type": ExceptionType.API,
-                "message":"Invalid refresh token"})
+            raise HTTPException(status_code=401, detail={"type": ExceptionType.API.value, "message": "Invalid refresh token"})
         except Exception as e:
-            raise HTTPException(status_code=400, detail={
-                "type": ExceptionType.API,
-                "message": str(e)
-            })
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": str(e)})
 
 
 class ResetPasswordResponse:
@@ -112,7 +102,7 @@ class ResetPasswordResponse:
             return JSONResponse(
                 status_code=200,
                 content={
-                    "type": ExceptionType.SUCCESS,
+                    "type": ExceptionType.SUCCESS.value,
                     "message": "user password updated successfully!",
                 },
             )
@@ -168,7 +158,7 @@ class GoogleOauthCallbackResponse:
                     )
                     user_info = user_info_response.json()
                     if user_info.get("error"):
-                        raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": user_info["error"]})
+                        raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": user_info["error"]})
                     user_info_dict = {
                         "email": user_info.get("email"),
                         "first_name": user_info.get("given_name"),
@@ -186,7 +176,7 @@ class GoogleOauthCallbackResponse:
                     return JSONResponse(
                         status_code=201,
                         content={
-                            "type": ExceptionType.SUCCESS,
+                            "type": ExceptionType.SUCCESS.value,
                             "message": "user created successfully!",
                             "data": custom_jsonable_encoder(registration_info_dict),
                             "refresh_token": refresh_token,
@@ -196,4 +186,4 @@ class GoogleOauthCallbackResponse:
                     )
 
         except Exception as e:
-            raise HTTPException(status_code=400, detail={"type": ExceptionType.API, "message": str(e)})
+            raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": str(e)})

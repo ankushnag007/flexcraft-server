@@ -2,7 +2,6 @@ aiosmtplib==4.0.0
 annotated-types==0.7.0
 anyio==4.9.0
 bcrypt==4.3.0
-bson==0.5.10
 certifi==2025.1.31
 cffi==1.17.1
 charset-normalizer==3.4.1
@@ -10,6 +9,7 @@ click==8.1.8
 colorama==0.4.6
 cryptography==44.0.2
 dnspython==2.7.0
+dotenv==0.9.9
 ecdsa==0.19.1
 email_validator==2.2.0
 fastapi==0.115.12
@@ -20,6 +20,7 @@ httptools==0.6.4
 httpx==0.28.1
 idna==3.10
 Jinja2==3.1.6
+loadenv==0.1.1
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
