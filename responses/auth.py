@@ -10,7 +10,11 @@ from constants.common import ExceptionType
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
 from schemas.auth import GoogleRegister, Login, RefreshToken, Register, ResetPassword
-from services.authentication import create_access_token, create_refresh_token, verify_token
+from services.authentication import (
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+)
 from services.email import send_mail_html
 
 from . import user_collection
@@ -168,7 +172,16 @@ class GoogleOauthCallbackResponse:
                         "is_verified": user_info.get("verified_email", False),
                     }
                     registration_info = GoogleRegister(**user_info_dict)
-                    registration_info_dict = registration_info.model_dump()
+                    try:
+                        registration_info_dict = registration_info.model_dump()
+                    except DuplicateKeyError as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail={
+                                "type": ExceptionType.DB_DUPLICACY.value,
+                                "message": str(e),
+                            },
+                        )
                     user_collection.insert_one(registration_info_dict)
                     access_token = create_access_token({"sub": str(registration_info_dict["_id"])})
                     refresh_token = create_refresh_token({"sub": str(registration_info_dict["_id"])})

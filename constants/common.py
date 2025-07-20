@@ -28,3 +28,58 @@ class ExceptionType(Enum):
     REFRESH_TOKEN_ERROR = "Refresh Token Error"
     ACCESS_DENIED_ERROR = "Access Denied Error"
     SUCCESS = "Success"
+
+
+@unique
+class StatusCode(Enum):
+    intial_setup_pending = 428
+
+
+@unique
+class DefaultRoles(Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    MANAGER = "manager"
+    USER = "user"
+
+
+@unique
+class CountryCode(Enum):
+    INDIA = "IN"
+    USA = "US"
+    UK = "GB"
+    CANADA = "CA"
+    AUSTRALIA = "AU"
+    GERMANY = "DE"
+    FRANCE = "FR"
+    JAPAN = "JP"
+    BRAZIL = "BR"
+    SOUTH_AFRICA = "ZA"
+
+
+@unique
+class CountryTimezone(Enum):
+    INDIA = "Asia/Kolkata"
+    USA = "America/New_York"
+    UK = "Europe/London"
+    CANADA = "America/Toronto"
+    AUSTRALIA = "Australia/Sydney"
+    GERMANY = "Europe/Berlin"
+    FRANCE = "Europe/Paris"
+    JAPAN = "Asia/Tokyo"
+    BRAZIL = "America/Sao_Paulo"
+    SOUTH_AFRICA = "Africa/Johannesburg"
+
+
+@unique
+class CountryDialCode(Enum):
+    INDIA = "+91"
+    USA = "+1"
+    UK = "+44"
+    CANADA = "+1"
+    AUSTRALIA = "+61"
+    GERMANY = "+49"
+    FRANCE = "+33"
+    JAPAN = "+81"
+    BRAZIL = "+55"
+    SOUTH_AFRICA = "+27"
