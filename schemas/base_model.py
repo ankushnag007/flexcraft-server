@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from bson import ObjectId
 from pydantic import (
@@ -26,21 +26,40 @@ class PyObjectId(ObjectId):
         return ObjectId(v)
 
 
+class InitBaseModel(BaseModel):
+    """
+    Base model for all schemas.
+    """
+
+    created_at: datetime = Field(get_current_utc_datetime())
+    updated_at: datetime = Field(get_current_utc_datetime())
+    created_by: PyObjectId = Field(PyObjectId("111111111111111111111111"))
+    updated_by: PyObjectId = Field(PyObjectId("111111111111111111111111"))
+
+    class Config:
+        json_encoders = {
+            ObjectId: lambda v: str(v),
+        }
+        validate_by_name = True
+        arbitrary_types_allowed = True
+
+
 class BasicFiledsCreate(BaseModel):
     """
     Base model for all schemas.
     """
 
-    id: PyObjectId = Field(default=PyObjectId(ObjectId()))
     created_at: datetime = Field(get_current_utc_datetime())
     updated_at: datetime = Field(get_current_utc_datetime())
-    created_by: PyObjectId = Field(...)
-    updated_by: PyObjectId = Field(...)
+    created_by: Optional[PyObjectId] = Field(None)
+    updated_by: Optional[PyObjectId] = Field(None)
 
-    def model_post_init(self, __context):
-        if self.__class__.__name__ in ["Register"]:
-            self.created_by = PyObjectId(ObjectId("111111111111111111111111"))
-            self.updated_by = PyObjectId(ObjectId("111111111111111111111111"))
+    class Config:
+        json_encoders = {
+            ObjectId: lambda v: str(v),
+        }
+        validate_by_name = True
+        arbitrary_types_allowed = True
 
 
 class BasicFiledsUpdateDelete(BaseModel):
@@ -51,5 +70,12 @@ class BasicFiledsUpdateDelete(BaseModel):
     id: PyObjectId = Field(default=PyObjectId(ObjectId()))
     created_at: datetime = Field(get_current_utc_datetime())
     updated_at: datetime = Field(get_current_utc_datetime())
-    created_by: PyObjectId = Field(...)
+    # created_by: PyObjectId = Field(...)
     updated_by: PyObjectId = Field(...)
+
+    class Config:
+        json_encoders = {
+            ObjectId: lambda v: str(v),
+        }
+        validate_by_name = True
+        arbitrary_types_allowed = True

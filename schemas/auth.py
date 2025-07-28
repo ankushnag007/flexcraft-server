@@ -12,9 +12,34 @@ from pydantic import (
     field_validator,
 )
 
-from constants.common import DefaultRoles
+from constants.common import Country, CountryCode, CountryTimezone, DefaultRoles
 from genric.datetime_helpers import get_current_utc_datetime
-from schemas.base_model import BasicFiledsCreate
+from schemas.base_model import BasicFiledsCreate, InitBaseModel
+
+
+class InitialUser(InitBaseModel):
+    email: EmailStr = Field(..., min_length=5, max_length=128)
+    password: SecretStr = Field(..., min_length=6, max_length=25)
+    first_name: str = Field(..., min_length=2, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=2, max_length=50)
+    role: DefaultRoles = Field(DefaultRoles.SUPER_ADMIN)
+
+    @field_validator("password")
+    def validate_password(cls, value):
+        value = value.get_secret_value()
+        if len(value) < 6:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not re.search(r"[A-Z]", value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one digit.")
+        if not re.search(r"[@$!%*?&]", value):
+            raise ValueError(
+                "Password must contain at least one special character (@$!%*?&)."
+            )
+        return SecretStr(value)
 
 
 class Company(BaseModel):
@@ -29,18 +54,18 @@ class Company(BaseModel):
     )
     sec_phone_number: Optional[
         Annotated[str, StringConstraints(pattern=r"^\d{10}$")]
-    ] = Field(..., min_length=10, max_length=10)
+    ] = Field(None, min_length=10, max_length=10)
     domain: str = Field(...)
-    invite_code: Optional[str] = Field(...)
+    invite_code: Optional[str] = Field(None)
     image: Optional[str] = Field(None)
     bck_image: Optional[str] = Field(None)
-    email: EmailStr = Field(..., min_length=5, max_length=128)
-    country: Optional[str] = Field(None, min_length=2, max_length=50)
-    timezone: Optional[str] = Field(None, min_length=2, max_length=50)
-    country_code: Optional[str] = Field(None, min_length=2, max_length=10)
+    email: Optional[EmailStr] = Field(None, min_length=5, max_length=128)
+    country: Country = Field(Country.INDIA)
+    timezone: CountryTimezone = Field(CountryTimezone.INDIA)
+    country_code: CountryCode = Field(CountryCode.INDIA)
 
 
-class Register(BasicFiledsCreate):
+class User(BasicFiledsCreate):
     email: EmailStr = Field(..., min_length=5, max_length=128)
     password:SecretStr = Field(..., min_length=6, max_length=25)
     first_name: str = Field(..., min_length=2, max_length=50)
@@ -53,11 +78,11 @@ class Register(BasicFiledsCreate):
     )
     image: Optional[str] = Field(None)
     bck_image: Optional[str] = Field(None)
-    country: Optional[str] = Field(...)
-    timezone: Optional[str] = Field(None, min_length=2, max_length=50)
-    country_code: Optional[str] = Field(None, min_length=2, max_length=10)
-    is_two_factor_auth: bool = Field(False)
-    last_login: Optional[datetime] = Field(get_current_utc_datetime())
+    country: Country = Field(Country.INDIA)
+    timezone: CountryTimezone = Field(CountryTimezone.INDIA)
+    country_code: CountryCode = Field(CountryCode.INDIA)
+    is_two_factor_auth: Optional[bool] = Field(False)
+    last_login: datetime = Field(get_current_utc_datetime())
 
     @field_validator("password")
     def validate_password(cls, value):
@@ -74,12 +99,35 @@ class Register(BasicFiledsCreate):
             raise ValueError("Password must contain at least one special character (@$!%*?&).")
         return SecretStr(value)
 
+
     class Config:
         json_encoders = {
             ObjectId: lambda v: str(v),
         }
         validate_by_name = True
         arbitrary_types_allowed = True
+
+class InitialRegister(BaseModel):
+    """
+    Schema for initial user registration.
+    """
+
+    user_details: InitialUser = Field(...)
+
+    @field_validator("user_details")
+    def validate_user_details(cls, value):
+        if not value.email or not value.password:
+            raise ValueError("Email and password are required.")
+        return value
+
+
+class Register(BaseModel):
+    """
+    Schema for user registration.
+    """
+
+    user_details: User = Field(...)
+    company_details: Company = Field(...)
 
 
 class Login(BaseModel):
@@ -138,14 +186,12 @@ class GoogleOauthCallback(BaseModel):
     ...
 
 
-class GoogleRegister(BaseModel):
+class GoogleRegister(InitBaseModel):
     email: EmailStr = Field(..., min_length=5, max_length=128)
     password: None = Field(None)
     first_name: str = Field(..., min_length=2, max_length=50)
     last_name: Optional[str] = Field(None, min_length=2, max_length=50)
-    role: Literal["user", "admin"] = Field("user")
+    role: DefaultRoles = Field(...)
     picture: Optional[str] = Field(None)
     is_google_login: bool = Field(True)
     is_verified: bool = Field(True)
-    created_at: datetime = Field(get_current_utc_datetime())
-    updated_at: datetime = Field(get_current_utc_datetime())

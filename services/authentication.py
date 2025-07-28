@@ -4,7 +4,12 @@ from jose import JWTError, jwt
 
 from genric.datetime_helpers import get_current_utc_datetime
 
-from . import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, REFRESH_TOKEN_EXPIRE_DAYS, SECRET_KEY
+from . import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    ALGORITHM,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    SECRET_KEY,
+)
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):

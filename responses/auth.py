@@ -6,10 +6,17 @@ from pydantic import SecretStr
 from pymongo.errors import DuplicateKeyError
 from requests_oauthlib import OAuth2Session
 
-from constants.common import ExceptionType
+from constants.common import DefaultRoles, ExceptionType
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
-from schemas.auth import GoogleRegister, Login, RefreshToken, Register, ResetPassword
+from schemas.auth import (
+    GoogleRegister,
+    InitialRegister,
+    Login,
+    RefreshToken,
+    Register,
+    ResetPassword,
+)
 from services.authentication import (
     create_access_token,
     create_refresh_token,
@@ -18,6 +25,59 @@ from services.authentication import (
 from services.email import send_mail_html
 
 from . import user_collection
+
+
+class InitRegisterResponse:
+    async def create(self, initial_register_dto: InitialRegister, request: Request):
+        try:
+            initial_register_info_dict = initial_register_dto.model_dump()[
+                "user_details"
+            ]
+
+            user = user_collection.find_one(
+                {"email": initial_register_info_dict["email"]}
+            )
+            if user:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.DB_DUPLICACY.value,
+                        "message": "User with this email already exists.",
+                    },
+                )
+            passwd_hash = PasswordCipher.encrypt_password(
+                initial_register_info_dict["password"].get_secret_value()
+            )
+            initial_register_info_dict["password"] = passwd_hash
+            user_collection.insert_one(initial_register_info_dict)
+            initial_register_info_dict["password"] = str(SecretStr(passwd_hash))
+            access_token = create_access_token(
+                {"_id": str(initial_register_info_dict["_id"])}
+            )
+            refresh_token = create_refresh_token(
+                {"_id": str(initial_register_info_dict["_id"])}
+            )
+            return JSONResponse(
+                status_code=201,
+                content={
+                    "type": ExceptionType.SUCCESS.value,
+                    "message": "user created successfully!",
+                    "data": custom_jsonable_encoder(initial_register_info_dict),
+                    "refresh_token": refresh_token,
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                },
+            )
+        except DuplicateKeyError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.DB_DUPLICACY.value, "message": str(e)},
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.API, "message": str(e)},
+            )
 
 
 class RegisterResponse:
@@ -164,36 +224,61 @@ class GoogleOauthCallbackResponse:
                     if user_info.get("error"):
                         raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": user_info["error"]})
                     user_info_dict = {
-                        "email": user_info.get("email"),
+                        "email": user_info["email"],
                         "first_name": user_info.get("given_name"),
                         "last_name": user_info.get("family_name"),
                         "picture": user_info.get("picture"),
                         "is_google_login": True,
                         "is_verified": user_info.get("verified_email", False),
                     }
-                    registration_info = GoogleRegister(**user_info_dict)
-                    try:
-                        registration_info_dict = registration_info.model_dump()
-                    except DuplicateKeyError as e:
-                        raise HTTPException(
-                            status_code=400,
-                            detail={
-                                "type": ExceptionType.DB_DUPLICACY.value,
-                                "message": str(e),
+                    user = user_collection.find_one({"email": user_info_dict["email"]})
+                    if not user:
+                        try:
+                            user_info_dict.update({"role": DefaultRoles.SUPER_ADMIN})
+                            registration_info = GoogleRegister(**user_info_dict)
+                            registration_info_dict = registration_info.model_dump()
+                            user_collection.insert_one(registration_info_dict)
+                            access_token = create_access_token(
+                                {"_id": str(registration_info_dict["_id"])}
+                            )
+                            refresh_token = create_refresh_token(
+                                {"_id": str(registration_info_dict["_id"])}
+                            )
+                        except DuplicateKeyError as e:
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "type": ExceptionType.DB_DUPLICACY.value,
+                                    "message": str(e),
+                                },
+                            )
+
+                        except Exception as e:
+                            raise HTTPException(
+                                status_code=400,
+                                detail={"type": ExceptionType.API, "message": str(e)},
+                            )
+
+                        return JSONResponse(
+                            status_code=201,
+                            content={
+                                "type": ExceptionType.SUCCESS,
+                                "message": "user created successfully!",
+                                "data": custom_jsonable_encoder(registration_info_dict),
+                                "refresh_token": refresh_token,
+                                "access_token": access_token,
+                                "token_type": "bearer",
                             },
                         )
-                    user_collection.insert_one(registration_info_dict)
-                    access_token = create_access_token({"sub": str(registration_info_dict["_id"])})
-                    refresh_token = create_refresh_token({"sub": str(registration_info_dict["_id"])})
 
                     return JSONResponse(
                         status_code=201,
                         content={
-                            "type": ExceptionType.SUCCESS.value,
+                            "type": ExceptionType.SUCCESS,
                             "message": "user created successfully!",
-                            "data": custom_jsonable_encoder(registration_info_dict),
-                            "refresh_token": refresh_token,
-                            "access_token": access_token,
+                            "data": "working on response since in process for now",
+                            "refresh_token": "refresh_token",
+                            "access_token": "access_token",
                             "token_type": "bearer",
                         },
                     )

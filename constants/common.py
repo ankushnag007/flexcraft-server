@@ -1,8 +1,8 @@
-from enum import Enum, unique
+from enum import Enum, StrEnum, unique
 
 
 @unique
-class ExceptionType(Enum):
+class ExceptionType(StrEnum):
     API = "API Exception"
     ARGUMENT = "INVALID_ARGUMENT"
     DB_INSERTION = "DB Insertion Failure"
@@ -36,7 +36,7 @@ class StatusCode(Enum):
 
 
 @unique
-class DefaultRoles(Enum):
+class DefaultRoles(StrEnum):
     SUPER_ADMIN = "super_admin"
     ADMIN = "admin"
     MANAGER = "manager"
@@ -44,7 +44,7 @@ class DefaultRoles(Enum):
 
 
 @unique
-class CountryCode(Enum):
+class Country(StrEnum):
     INDIA = "IN"
     USA = "US"
     UK = "GB"
@@ -58,7 +58,7 @@ class CountryCode(Enum):
 
 
 @unique
-class CountryTimezone(Enum):
+class CountryTimezone(StrEnum):
     INDIA = "Asia/Kolkata"
     USA = "America/New_York"
     UK = "Europe/London"
@@ -71,8 +71,7 @@ class CountryTimezone(Enum):
     SOUTH_AFRICA = "Africa/Johannesburg"
 
 
-@unique
-class CountryDialCode(Enum):
+class CountryCode(StrEnum):
     INDIA = "+91"
     USA = "+1"
     UK = "+44"
