@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta, tzinfo
-from typing import Annotated, Dict, Literal, Optional
+from typing import Annotated, Dict, Literal, Optional, Union
 
 from bson import ObjectId
 from pydantic import (
@@ -65,6 +65,27 @@ class Company(GenricFiledsCreate):
     timezone: CountryTimezone = Field(CountryTimezone.INDIA)
     country_code: CountryCode = Field(CountryCode.INDIA)
 
+class CompanyUpdate(BasicFiledsUpdate):
+    """
+    Schema for company information.
+    """
+
+    domain: Optional[str | None] = Field(None)
+    name: str = Field(..., min_length=2, max_length=100)
+    address: str = Field(..., min_length=5, max_length=255)
+    phone_number: Annotated[str, StringConstraints(pattern=r"^\d{10}$")] = Field(
+        ..., min_length=10, max_length=10
+    )
+    sec_phone_number: Optional[
+        Annotated[str, StringConstraints(pattern=r"^\d{10}$")]
+    ] = Field(None, min_length=10, max_length=10)
+    image: Optional[str] = Field(None)
+    bck_image: Optional[str] = Field(None)
+    email: EmailStr = Field(..., min_length=5, max_length=128)
+    country: Country = Field(Country.INDIA)
+    timezone: CountryTimezone = Field(CountryTimezone.INDIA)
+    country_code: CountryCode = Field(CountryCode.INDIA)
+
 
 class User(BasicFiledsUpdate):
     email: Optional[EmailStr] = Field(..., min_length=5, max_length=128)
@@ -83,7 +104,6 @@ class User(BasicFiledsUpdate):
     timezone: CountryTimezone = Field(CountryTimezone.INDIA)
     country_code: CountryCode = Field(CountryCode.INDIA)
     is_two_factor_auth: Optional[bool] = Field(False)
-    last_login: datetime = Field(get_current_utc_datetime())
 
     @field_validator("password")
     def validate_password(cls, value):
@@ -129,6 +149,14 @@ class Register(BaseModel):
 
     user_details: User = Field(...)
     company_details: Company = Field(...)
+
+class RegisterUpdate(BaseModel):
+    """
+    Schema for user registration.
+    """
+
+    user_details: User = Field(...)
+    company_details: CompanyUpdate = Field(...)
 
 
 class Login(BaseModel):

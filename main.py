@@ -1,3 +1,5 @@
+from typing import Union
+
 from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 from zstd_asgi import ZstdMiddleware
@@ -19,6 +21,7 @@ from schemas.auth import (
     Login,
     RefreshToken,
     Register,
+    RegisterUpdate,
     ResetPassword,
 )
 
@@ -58,7 +61,7 @@ app.add_middleware(
 
 app.include_router(
     generate_crud_routes(
-        dto=InitialRegister,
+        dto_create=InitialRegister,
         response_model=InitRegisterResponse,
         prefix="/init_register",
         tags=["Auth"],
@@ -71,20 +74,20 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=Register,
+        dto_create=Register,
+        dto_update=RegisterUpdate,
         response_model=RegisterResponse,
         prefix="/register",
         tags=["Auth"],
         include_read=False,
         include_read_all=False,
-        include_update=False,
         include_delete=False,
     )
 )
 
 app.include_router(
     generate_crud_routes(
-        dto=Login,
+        dto_create=Login,
         response_model=LoginResponse,
         prefix="/login",
         tags=["Auth"],
@@ -97,7 +100,7 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=RefreshToken,
+        dto_create=RefreshToken,
         response_model=RefreshTokenResponse,
         prefix="/refresh-token",
         tags=["Auth"],
@@ -110,7 +113,7 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=ResetPassword,
+        dto_create=ResetPassword,
         response_model=ResetPasswordResponse,
         prefix="/reset-password",
         tags=["Auth"],
@@ -123,7 +126,7 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=GoogleOauth,
+        dto_create=GoogleOauth,
         response_model=GoogleOauthResponse,
         prefix="/google-oauth",
         tags=["Auth"],
@@ -137,7 +140,7 @@ app.include_router(
 
 app.include_router(
     generate_crud_routes(
-        dto=GoogleOauthCallback,
+        dto_create=GoogleOauthCallback,
         response_model=GoogleOauthCallbackResponse,
         prefix="/google-oauth-callback",
         tags=["Auth"],

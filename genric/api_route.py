@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 def generate_crud_routes(
-    dto: Type[BaseModel],
+    dto_create: Type[BaseModel],
     response_model,
     prefix: str,
     *,
@@ -17,14 +17,17 @@ def generate_crud_routes(
     include_update: bool = True,
     include_delete: bool = True,
     include_in_schema: bool = True,
+    dto_update: Optional[Type[BaseModel]] = None,
 ) -> APIRouter:
     router = APIRouter()
     crud_service = response_model()
+    if not dto_update:
+        dto_update = dto_create
 
     if include_create:
 
         @router.post(f"{prefix}", response_model=Dict, tags=tags, include_in_schema=include_in_schema)
-        async def create_item(item: dto, request: Request):
+        async def create_item(item: dto_create, request: Request):
             return await crud_service.create(item, request)
 
     if include_read:
@@ -41,9 +44,17 @@ def generate_crud_routes(
 
     if include_update:
 
-        @router.put(f"{prefix}/{{item_id}}", response_model=Dict | None, tags=tags, include_in_schema=include_in_schema)
-        async def update_item(item_id: ObjectId, item: dto, request: Request):
-            return await crud_service.update(item_id, item, request)
+        @router.put(
+            f"{prefix}",
+            response_model=Dict | None,
+            tags=tags,
+            include_in_schema=include_in_schema,
+        )
+        async def update_item(
+            item: dto_update,
+            request: Request,
+        ):
+            return await crud_service.update(item, request)
 
     if include_delete:
 
