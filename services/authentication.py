@@ -34,3 +34,12 @@ def verify_token(token: str, expected_type="access"):
         return payload
     except JWTError:
         return None
+
+
+def decode_access_token(token: str):
+    try:
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return decoded_token  # This will be a dictionary
+    except JWTError as e:
+        print(f"Token decode error: {e}")
+        return None

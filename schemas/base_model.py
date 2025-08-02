@@ -26,7 +26,7 @@ class PyObjectId(ObjectId):
         return ObjectId(v)
 
 
-class InitBaseModel(BaseModel):
+class BasicFiledsCreate(BaseModel):
     """
     Base model for all schemas.
     """
@@ -44,15 +44,14 @@ class InitBaseModel(BaseModel):
         arbitrary_types_allowed = True
 
 
-class BasicFiledsCreate(BaseModel):
+class BasicFiledsUpdate(BaseModel):
     """
     Base model for all schemas.
     """
 
-    created_at: datetime = Field(get_current_utc_datetime())
+    record_id: PyObjectId = Field(default=PyObjectId(ObjectId()))
     updated_at: datetime = Field(get_current_utc_datetime())
-    created_by: Optional[PyObjectId] = Field(None)
-    updated_by: Optional[PyObjectId] = Field(None)
+    updated_by: PyObjectId = Field(...)
 
     class Config:
         json_encoders = {
@@ -61,16 +60,14 @@ class BasicFiledsCreate(BaseModel):
         validate_by_name = True
         arbitrary_types_allowed = True
 
-
-class BasicFiledsUpdateDelete(BaseModel):
+class GenricFiledsCreate(BaseModel):
     """
     Base model for all schemas.
     """
 
-    id: PyObjectId = Field(default=PyObjectId(ObjectId()))
     created_at: datetime = Field(get_current_utc_datetime())
     updated_at: datetime = Field(get_current_utc_datetime())
-    # created_by: PyObjectId = Field(...)
+    created_by: PyObjectId = Field(...)
     updated_by: PyObjectId = Field(...)
 
     class Config:

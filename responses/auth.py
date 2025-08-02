@@ -23,8 +23,9 @@ from services.authentication import (
     verify_token,
 )
 from services.email import send_mail_html
+from utils.generate_unique_code import generate_invite_code, generate_unique_company_id
 
-from . import user_collection
+from . import company_collection, user_collection
 
 
 class InitRegisterResponse:
@@ -52,10 +53,10 @@ class InitRegisterResponse:
             user_collection.insert_one(initial_register_info_dict)
             initial_register_info_dict["password"] = str(SecretStr(passwd_hash))
             access_token = create_access_token(
-                {"_id": str(initial_register_info_dict["_id"])}
+                {"user_id": str(initial_register_info_dict["_id"])}
             )
             refresh_token = create_refresh_token(
-                {"_id": str(initial_register_info_dict["_id"])}
+                {"user_id": str(initial_register_info_dict["_id"])}
             )
             return JSONResponse(
                 status_code=201,
@@ -84,12 +85,91 @@ class RegisterResponse:
     async def create(self, register_dto: Register, request: Request):
         try:
             register_info_dict = register_dto.model_dump()
-            passwd_hash = PasswordCipher.encrypt_password(register_info_dict["password"].get_secret_value())
-            register_info_dict["password"] = passwd_hash
-            user_collection.insert_one(register_info_dict)
-            register_info_dict["password"] = str(SecretStr(passwd_hash))
-            access_token = create_access_token({"sub": str(register_info_dict["_id"])})
-            refresh_token = create_refresh_token({"sub": str(register_info_dict["_id"])})
+            if register_info_dict["company_details"].get(
+                "domain"
+            ) and company_collection.find_one(
+                {"domain": register_info_dict["company_details"]["domain"]}
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Domain already taken. Please use a different domain.",
+                    },
+                )
+            if register_info_dict["company_details"].get(
+                "email"
+            ) and company_collection.find_one(
+                {"email": register_info_dict["company_details"]["email"]}
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Company already registered with this email. Please use a different email. or update the existing company.",
+                    },
+                )
+            if register_info_dict["user_details"].get("password"):
+                passwd_hash = PasswordCipher.encrypt_password(
+                    register_info_dict["user_details"]["password"].get_secret_value()
+                )
+                register_info_dict["user_details"]["password"] = passwd_hash
+            try:
+                updated_user = user_collection.find_one_and_update(
+                    {"_id": register_info_dict["user_details"]["record_id"]},
+                    {"$set": {"field_to_update": register_info_dict["user_details"]}},
+                    return_document=True,
+                )
+                if not updated_user:
+                    raise HTTPException(
+                        status_code=404,
+                        detail={
+                            "type": ExceptionType.API.value,
+                            "message": "User not found.",
+                        },
+                    )
+                if updated_user:
+                    commpany_id = str(
+                        (
+                            company_collection.insert_one(
+                                {
+                                    **register_info_dict["company_details"],
+                                    "invite_code": generate_invite_code(
+                                        register_info_dict["company_details"].get(
+                                            "domain"
+                                        )
+                                    ),
+                                }
+                            )
+                        ).inserted_id
+                    )
+                    register_info_dict["company_details"]["_id"] = commpany_id
+                    register_info_dict["user_details"]["company_id"] = commpany_id
+                    register_info_dict["user_details"] = updated_user
+
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.DB_INSERTION.value,
+                        "message": str(e),
+                    },
+                )
+            register_info_dict["user_details"]["password"] = str(
+                SecretStr(register_info_dict["user_details"]["password"])
+            )
+            access_token = create_access_token(
+                {
+                    "user_id": str(register_info_dict["user_details"]["_id"]),
+                    "company_id": register_info_dict["company_details"]["_id"],
+                }
+            )
+            refresh_token = create_refresh_token(
+                {
+                    "user__id": str(register_info_dict["user_details"]["_id"]),
+                    "company_id": register_info_dict["company_details"]["_id"],
+                }
+            )
             return JSONResponse(
                 status_code=201,
                 content={

@@ -14,10 +14,10 @@ from pydantic import (
 
 from constants.common import Country, CountryCode, CountryTimezone, DefaultRoles
 from genric.datetime_helpers import get_current_utc_datetime
-from schemas.base_model import BasicFiledsCreate, InitBaseModel
+from schemas.base_model import BasicFiledsCreate, BasicFiledsUpdate, GenricFiledsCreate
 
 
-class InitialUser(InitBaseModel):
+class InitialUser(BasicFiledsCreate):
     email: EmailStr = Field(..., min_length=5, max_length=128)
     password: SecretStr = Field(..., min_length=6, max_length=25)
     first_name: str = Field(..., min_length=2, max_length=50)
@@ -41,8 +41,10 @@ class InitialUser(InitBaseModel):
             )
         return SecretStr(value)
 
+from slugify import slugify
 
-class Company(BaseModel):
+
+class Company(GenricFiledsCreate):
     """
     Schema for company information.
     """
@@ -56,21 +58,20 @@ class Company(BaseModel):
         Annotated[str, StringConstraints(pattern=r"^\d{10}$")]
     ] = Field(None, min_length=10, max_length=10)
     domain: str = Field(...)
-    invite_code: Optional[str] = Field(None)
     image: Optional[str] = Field(None)
     bck_image: Optional[str] = Field(None)
-    email: Optional[EmailStr] = Field(None, min_length=5, max_length=128)
+    email: EmailStr = Field(..., min_length=5, max_length=128)
     country: Country = Field(Country.INDIA)
     timezone: CountryTimezone = Field(CountryTimezone.INDIA)
     country_code: CountryCode = Field(CountryCode.INDIA)
 
 
-class User(BasicFiledsCreate):
-    email: EmailStr = Field(..., min_length=5, max_length=128)
-    password:SecretStr = Field(..., min_length=6, max_length=25)
-    first_name: str = Field(..., min_length=2, max_length=50)
+class User(BasicFiledsUpdate):
+    email: Optional[EmailStr] = Field(..., min_length=5, max_length=128)
+    password: Optional[SecretStr] = Field(..., min_length=6, max_length=25)
+    first_name: Optional[str] = Field(..., min_length=2, max_length=50)
     last_name: Optional[str] = Field(None, min_length=2, max_length=50)
-    role: DefaultRoles = Field(DefaultRoles.USER)
+    role: Optional[DefaultRoles] = Field(DefaultRoles.USER)
     is_google_login: bool = False
     is_verified: bool = False
     phone_number: Annotated[str, StringConstraints(pattern=r"^\d{10}$")] = Field(
@@ -186,7 +187,7 @@ class GoogleOauthCallback(BaseModel):
     ...
 
 
-class GoogleRegister(InitBaseModel):
+class GoogleRegister(BasicFiledsCreate):
     email: EmailStr = Field(..., min_length=5, max_length=128)
     password: None = Field(None)
     first_name: str = Field(..., min_length=2, max_length=50)
