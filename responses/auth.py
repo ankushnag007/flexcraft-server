@@ -7,7 +7,13 @@ from pydantic import SecretStr
 from pymongo.errors import DuplicateKeyError
 from requests_oauthlib import OAuth2Session
 
-from constants.common import DefaultRoles, ExceptionType
+from constants.common import DefaultRoles, ExceptionType, RequestMethod
+from genric.authentication import (
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+)
+from genric.datetime_helpers import get_current_utc_datetime
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
 from schemas.auth import (
@@ -19,12 +25,8 @@ from schemas.auth import (
     RegisterUpdate,
     ResetPassword,
 )
-from services.authentication import (
-    create_access_token,
-    create_refresh_token,
-    verify_token,
-)
 from services.email import send_mail_html
+from utils.decorator import validate_token
 from utils.generate_unique_code import generate_invite_code, generate_unique_company_id
 
 from . import company_collection, user_collection
@@ -84,7 +86,13 @@ class InitRegisterResponse:
 
 
 class RegisterResponse:
-    async def create(self, register_dto: Register, request: Request):
+    @validate_token
+    async def create(
+        self,
+        register_dto: Register,
+        request: Request,
+        request_type: RequestMethod = RequestMethod.POST,
+    ):
         try:
             register_info_dict = register_dto.model_dump()
             if register_info_dict["company_details"].get(
@@ -118,9 +126,16 @@ class RegisterResponse:
                 register_info_dict["user_details"]["password"] = passwd_hash
             try:
                 register_info_dict["user_details"]["company_id"] = ObjectId()
+                user_id = register_info_dict["user_details"].pop("record_id")
                 updated_user = user_collection.find_one_and_update(
-                    {"_id": register_info_dict["user_details"].pop("record_id")},
-                    {"$set": register_info_dict["user_details"]},
+                    {"_id": user_id},
+                    {
+                        "$set": {
+                            **register_info_dict["user_details"],
+                            "updated_at": get_current_utc_datetime(),
+                            "updated_by": ObjectId(user_id),
+                        }
+                    },
                     return_document=True,
                 )
                 if not updated_user:
@@ -143,6 +158,8 @@ class RegisterResponse:
                                             "domain"
                                         ),
                                     ),
+                                    "created_at": get_current_utc_datetime(),
+                                    "updated_at": get_current_utc_datetime(),
                                     "created_by": ObjectId(
                                         register_info_dict["user_details"]["_id"]
                                     ),
@@ -207,7 +224,13 @@ class RegisterResponse:
                 detail={"type": ExceptionType.API.value, "message": str(e)},
             )
 
-    async def update(self, register_dto: RegisterUpdate, request: Request):
+    @validate_token
+    async def update(
+        self,
+        register_dto: RegisterUpdate,
+        request: Request,
+        request_type: RequestMethod = RequestMethod.PUT,
+    ):
         try:
             register_info_dict = register_dto.model_dump()
             company_id = register_info_dict["company_details"].pop("record_id")
@@ -226,9 +249,8 @@ class RegisterResponse:
                     },
                 )
             if (
-                company_domain and company_domain != company_db_domain.get("domain")
-            ) or (
                 company_domain
+                and company_domain != company_db_domain.get("domain")
                 and company_collection.find_one({"domain": company_domain})
             ):
                 raise HTTPException(
@@ -339,8 +361,12 @@ class LoginResponse:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             if PasswordCipher.decrypt_password(user["password"]) != login_info_dict["password"].get_secret_value():
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            access_token = create_access_token({"sub": str(user["_id"])})
-            refresh_token = create_refresh_token({"sub": str(user["_id"])})
+            access_token = create_access_token(
+                {"user_id": str(user["_id"]), "company_id": str(user["company_id"])}
+            )
+            refresh_token = create_refresh_token(
+                {"user_id": str(user["_id"]), "company_id": str(user["company_id"])}
+            )
             return JSONResponse(
                 status_code=200,
                 content={
@@ -362,8 +388,11 @@ class RefreshTokenResponse:
             if not payload: 
                 raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-            user_id = payload.get("sub")
-            new_access_token = create_access_token({"sub": user_id})
+            user_id = payload.get("user_id")
+            company_id = payload.get("company_id")
+            new_access_token = create_access_token(
+                {"user_id": user_id, "company_id": company_id}
+            )
             return JSONResponse(
                 status_code=201,
                 content={"type": ExceptionType.SUCCESS.value, "message": "new token generated successfully!", "access_token": new_access_token, "token_type": "bearer"},

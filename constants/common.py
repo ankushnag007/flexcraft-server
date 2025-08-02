@@ -82,3 +82,10 @@ class CountryCode(StrEnum):
     JAPAN = "+81"
     BRAZIL = "+55"
     SOUTH_AFRICA = "+27"
+
+class RequestMethod(StrEnum):
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    DELETE = "DELETE"
+    GETALL = "GETALL"

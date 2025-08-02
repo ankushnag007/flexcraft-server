@@ -14,6 +14,7 @@ from responses.auth import (
     RegisterResponse,
     ResetPasswordResponse,
 )
+from responses.project import ProjectResponse
 from schemas.auth import (
     GoogleOauth,
     GoogleOauthCallback,
@@ -24,6 +25,7 @@ from schemas.auth import (
     RegisterUpdate,
     ResetPassword,
 )
+from schemas.project import Project
 
 #
 # App
@@ -33,7 +35,25 @@ app = FastAPI(
     swagger_ui_init_oauth={
         "appName": "Credentialing API",
         "usePkceWithAuthorizationCodeGrant": True,
+        "authFlowType": "authorizationCode",
+        "persistAuthorization": True,
     },
+    title="Flexcraft API",
+    description="Flexcraft API with Bearer Token",
+    version="1.0.0",
+    openapi_tags=[
+        {
+            "name": "Auth",
+            "description": "Authentication and Authorization related endpoints.",
+        },
+        {
+            "name": "Project",
+            "description": "Project management related endpoints.",
+        },
+    ],
+    openapi_url="/openapi.json",
+    redoc_url="/redoc",  # Redoc documentation URL
+    openapi_prefix="/api/v1",  # Prefix for OpenAPI schema
 )
 
 origins = [
@@ -150,5 +170,18 @@ app.include_router(
         include_update=False,
         include_delete=False,
         include_in_schema=False,
+    )
+)
+
+app.include_router(
+    generate_crud_routes(
+        dto_create=Project,
+        response_model=ProjectResponse,
+        prefix="/projects",
+        tags=["Project"],
+        include_read=False,
+        include_read_all=False,
+        include_update=False,
+        include_delete=False,
     )
 )
