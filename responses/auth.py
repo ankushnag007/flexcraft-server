@@ -1,4 +1,5 @@
 import httpx
+from bson import ObjectId
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError, jwt
@@ -6,26 +7,206 @@ from pydantic import SecretStr
 from pymongo.errors import DuplicateKeyError
 from requests_oauthlib import OAuth2Session
 
-from constants.common import ExceptionType
+from constants.common import DefaultRoles, ExceptionType, RequestMethod
+from genric.authentication import (
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+)
+from genric.datetime_helpers import get_current_utc_datetime
 from genric.encrypt import PasswordCipher
 from genric.serializer import custom_jsonable_encoder
-from schemas.auth import GoogleRegister, Login, RefreshToken, Register, ResetPassword
-from services.authentication import create_access_token, create_refresh_token, verify_token
+from schemas.auth import (
+    GoogleRegister,
+    InitialRegister,
+    Login,
+    RefreshToken,
+    Register,
+    RegisterUpdate,
+    ResetPassword,
+)
 from services.email import send_mail_html
+from utils.decorator import validate_token
+from utils.generate_unique_code import generate_invite_code, generate_unique_company_id
 
-from . import user_collection
+from . import company_collection, user_collection
+
+
+class InitRegisterResponse:
+    async def create(self, initial_register_dto: InitialRegister, request: Request):
+        try:
+            initial_register_info_dict = initial_register_dto.model_dump()[
+                "user_details"
+            ]
+
+            user = user_collection.find_one(
+                {"email": initial_register_info_dict["email"]}
+            )
+            if user:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.DB_DUPLICACY.value,
+                        "message": "User with this email already exists.",
+                    },
+                )
+            passwd_hash = PasswordCipher.encrypt_password(
+                initial_register_info_dict["password"].get_secret_value()
+            )
+            initial_register_info_dict["password"] = passwd_hash
+            user_collection.insert_one(initial_register_info_dict)
+            initial_register_info_dict["password"] = str(SecretStr(passwd_hash))
+            access_token = create_access_token(
+                {"user_id": str(initial_register_info_dict["_id"])}
+            )
+            refresh_token = create_refresh_token(
+                {"user_id": str(initial_register_info_dict["_id"])}
+            )
+            return JSONResponse(
+                status_code=201,
+                content={
+                    "type": ExceptionType.SUCCESS.value,
+                    "message": "user created successfully!",
+                    "data": custom_jsonable_encoder(initial_register_info_dict),
+                    "refresh_token": refresh_token,
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                },
+            )
+        except DuplicateKeyError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.DB_DUPLICACY.value, "message": str(e)},
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.API, "message": str(e)},
+            )
 
 
 class RegisterResponse:
-    async def create(self, register_dto: Register, request: Request):
+    @validate_token
+    async def create(
+        self,
+        register_dto: Register,
+        request: Request,
+        request_type: RequestMethod = RequestMethod.POST,
+    ):
         try:
             register_info_dict = register_dto.model_dump()
-            passwd_hash = PasswordCipher.encrypt_password(register_info_dict["password"].get_secret_value())
-            register_info_dict["password"] = passwd_hash
-            user_collection.insert_one(register_info_dict)
-            register_info_dict["password"] = str(SecretStr(passwd_hash))
-            access_token = create_access_token({"sub": str(register_info_dict["_id"])})
-            refresh_token = create_refresh_token({"sub": str(register_info_dict["_id"])})
+            if register_info_dict["company_details"].get(
+                "domain"
+            ) and company_collection.find_one(
+                {"domain": register_info_dict["company_details"]["domain"]}
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Domain already taken. Please use a different domain.",
+                    },
+                )
+            if register_info_dict["company_details"].get(
+                "email"
+            ) and company_collection.find_one(
+                {"email": register_info_dict["company_details"]["email"]}
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Company already registered with this email. Please use a different email. or update the existing company.",
+                    },
+                )
+            if register_info_dict["user_details"].get("password"):
+                passwd_hash = PasswordCipher.encrypt_password(
+                    register_info_dict["user_details"]["password"].get_secret_value()
+                )
+                register_info_dict["user_details"]["password"] = passwd_hash
+            try:
+                register_info_dict["user_details"]["company_id"] = ObjectId()
+                user_id = register_info_dict["user_details"].pop("record_id")
+                updated_user = user_collection.find_one_and_update(
+                    {"_id": user_id},
+                    {
+                        "$set": {
+                            **register_info_dict["user_details"],
+                            "updated_at": get_current_utc_datetime(),
+                            "updated_by": ObjectId(user_id),
+                        }
+                    },
+                    return_document=True,
+                )
+                if not updated_user:
+                    raise HTTPException(
+                        status_code=404,
+                        detail={
+                            "type": ExceptionType.API.value,
+                            "message": "User not found.",
+                        },
+                    )
+                if updated_user:
+                    register_info_dict["user_details"] = updated_user
+                    commpany_id = str(
+                        (
+                            company_collection.insert_one(
+                                {
+                                    **register_info_dict["company_details"],
+                                    "invite_code": generate_invite_code(
+                                        register_info_dict["company_details"].get(
+                                            "domain"
+                                        ),
+                                    ),
+                                    "created_at": get_current_utc_datetime(),
+                                    "updated_at": get_current_utc_datetime(),
+                                    "created_by": ObjectId(
+                                        register_info_dict["user_details"]["_id"]
+                                    ),
+                                    "updated_by": ObjectId(
+                                        register_info_dict["user_details"]["_id"]
+                                    ),
+                                    "_id": register_info_dict["user_details"][
+                                        "company_id"
+                                    ],
+                                }
+                            )
+                        ).inserted_id
+                    )
+                    register_info_dict["company_details"]["_id"] = commpany_id
+                    register_info_dict["user_details"]["company_id"] = commpany_id
+                    register_info_dict["user_details"] = updated_user
+            except DuplicateKeyError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.DB_DUPLICACY.value,
+                        "message": str(e),
+                    },
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.DB_INSERTION.value,
+                        "message": str(e),
+                    },
+                )
+            register_info_dict["user_details"]["password"] = str(
+                SecretStr(register_info_dict["user_details"]["password"])
+            )
+            access_token = create_access_token(
+                {
+                    "user_id": str(register_info_dict["user_details"]["_id"]),
+                    "company_id": register_info_dict["company_details"]["_id"],
+                }
+            )
+            refresh_token = create_refresh_token(
+                {
+                    "user__id": str(register_info_dict["user_details"]["_id"]),
+                    "company_id": register_info_dict["company_details"]["_id"],
+                }
+            )
             return JSONResponse(
                 status_code=201,
                 content={
@@ -37,11 +218,140 @@ class RegisterResponse:
                     "token_type": "bearer",
                 },
             )
-        except DuplicateKeyError as e:
-            raise HTTPException(status_code=400, detail={"type": ExceptionType.DB_DUPLICACY.value, "message": str(e)})
         except Exception as e:
-            raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": str(e)})
-    
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.API.value, "message": str(e)},
+            )
+
+    @validate_token
+    async def update(
+        self,
+        register_dto: RegisterUpdate,
+        request: Request,
+        request_type: RequestMethod = RequestMethod.PUT,
+    ):
+        try:
+            register_info_dict = register_dto.model_dump()
+            company_id = register_info_dict["company_details"].pop("record_id")
+            user_id = register_info_dict["user_details"].pop("record_id")
+            company_domain = register_info_dict["company_details"]["domain"]
+            company_db_domain = company_collection.find_one(
+                {"_id": ObjectId(company_id)},
+                {"_id": 0, "domain": 1},
+            )
+            if not company_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Please register first or check you details are correct.",
+                    },
+                )
+            if (
+                company_domain
+                and company_domain != company_db_domain.get("domain")
+                and company_collection.find_one({"domain": company_domain})
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": ExceptionType.API.value,
+                        "message": "Domain already taken. Please use a different domain.",
+                    },
+                )
+            else:
+                del register_info_dict["company_details"]["domain"]
+            if user_id:
+                if register_info_dict["user_details"].get("password"):
+                    passwd_hash = PasswordCipher.encrypt_password(
+                        register_info_dict["user_details"][
+                            "password"
+                        ].get_secret_value()
+                    )
+                    register_info_dict["user_details"]["password"] = passwd_hash
+                try:
+                    updated_user = user_collection.find_one_and_update(
+                        {"_id": user_id},
+                        {"$set": register_info_dict["user_details"]},
+                        return_document=True,
+                    )
+                    if not updated_user:
+                        raise HTTPException(
+                            status_code=404,
+                            detail={
+                                "type": ExceptionType.API.value,
+                                "message": "User not found.",
+                            },
+                        )
+                    register_info_dict["user_details"] = updated_user
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "type": ExceptionType.DB_INSERTION.value,
+                            "message": str(e),
+                        },
+                    )
+
+            if company_id:
+                try:
+                    updated_company = company_collection.find_one_and_update(
+                        {"_id": company_id},
+                        {"$set": register_info_dict["company_details"]},
+                        return_document=True,
+                    )
+                    if not updated_company:
+                        raise HTTPException(
+                            status_code=404,
+                            detail={
+                                "type": ExceptionType.API.value,
+                                "message": "Company not found.",
+                            },
+                        )
+                    register_info_dict["company_details"] = updated_company
+
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "type": ExceptionType.DB_INSERTION.value,
+                            "message": str(e),
+                        },
+                    )
+            register_info_dict["user_details"]["password"] = str(
+                SecretStr(register_info_dict["user_details"]["password"])
+            )
+            access_token = create_access_token(
+                {
+                    "user_id": str(user_id),
+                    "company_id": str(company_id),
+                }
+            )
+            refresh_token = create_refresh_token(
+                {
+                    "user_id": str(user_id),
+                    "company_id": str(company_id),
+                }
+            )
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "type": ExceptionType.SUCCESS.value,
+                    "message": "user created successfully!",
+                    "data": custom_jsonable_encoder(register_info_dict),
+                    "refresh_token": refresh_token,
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                },
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"type": ExceptionType.API.value, "message": str(e)},
+            )
+
+
 class LoginResponse:
     async def create(self, login_dto: Login, request: Request):
         try:
@@ -51,8 +361,12 @@ class LoginResponse:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             if PasswordCipher.decrypt_password(user["password"]) != login_info_dict["password"].get_secret_value():
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            access_token = create_access_token({"sub": str(user["_id"])})
-            refresh_token = create_refresh_token({"sub": str(user["_id"])})
+            access_token = create_access_token(
+                {"user_id": str(user["_id"]), "company_id": str(user["company_id"])}
+            )
+            refresh_token = create_refresh_token(
+                {"user_id": str(user["_id"]), "company_id": str(user["company_id"])}
+            )
             return JSONResponse(
                 status_code=200,
                 content={
@@ -74,8 +388,11 @@ class RefreshTokenResponse:
             if not payload: 
                 raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-            user_id = payload.get("sub")
-            new_access_token = create_access_token({"sub": user_id})
+            user_id = payload.get("user_id")
+            company_id = payload.get("company_id")
+            new_access_token = create_access_token(
+                {"user_id": user_id, "company_id": company_id}
+            )
             return JSONResponse(
                 status_code=201,
                 content={"type": ExceptionType.SUCCESS.value, "message": "new token generated successfully!", "access_token": new_access_token, "token_type": "bearer"},
@@ -160,27 +477,61 @@ class GoogleOauthCallbackResponse:
                     if user_info.get("error"):
                         raise HTTPException(status_code=400, detail={"type": ExceptionType.API.value, "message": user_info["error"]})
                     user_info_dict = {
-                        "email": user_info.get("email"),
+                        "email": user_info["email"],
                         "first_name": user_info.get("given_name"),
                         "last_name": user_info.get("family_name"),
                         "picture": user_info.get("picture"),
                         "is_google_login": True,
                         "is_verified": user_info.get("verified_email", False),
                     }
-                    registration_info = GoogleRegister(**user_info_dict)
-                    registration_info_dict = registration_info.model_dump()
-                    user_collection.insert_one(registration_info_dict)
-                    access_token = create_access_token({"sub": str(registration_info_dict["_id"])})
-                    refresh_token = create_refresh_token({"sub": str(registration_info_dict["_id"])})
+                    user = user_collection.find_one({"email": user_info_dict["email"]})
+                    if not user:
+                        try:
+                            user_info_dict.update({"role": DefaultRoles.SUPER_ADMIN})
+                            registration_info = GoogleRegister(**user_info_dict)
+                            registration_info_dict = registration_info.model_dump()
+                            user_collection.insert_one(registration_info_dict)
+                            access_token = create_access_token(
+                                {"_id": str(registration_info_dict["_id"])}
+                            )
+                            refresh_token = create_refresh_token(
+                                {"_id": str(registration_info_dict["_id"])}
+                            )
+                        except DuplicateKeyError as e:
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "type": ExceptionType.DB_DUPLICACY.value,
+                                    "message": str(e),
+                                },
+                            )
+
+                        except Exception as e:
+                            raise HTTPException(
+                                status_code=400,
+                                detail={"type": ExceptionType.API, "message": str(e)},
+                            )
+
+                        return JSONResponse(
+                            status_code=201,
+                            content={
+                                "type": ExceptionType.SUCCESS,
+                                "message": "user created successfully!",
+                                "data": custom_jsonable_encoder(registration_info_dict),
+                                "refresh_token": refresh_token,
+                                "access_token": access_token,
+                                "token_type": "bearer",
+                            },
+                        )
 
                     return JSONResponse(
                         status_code=201,
                         content={
-                            "type": ExceptionType.SUCCESS.value,
+                            "type": ExceptionType.SUCCESS,
                             "message": "user created successfully!",
-                            "data": custom_jsonable_encoder(registration_info_dict),
-                            "refresh_token": refresh_token,
-                            "access_token": access_token,
+                            "data": "working on response since in process for now",
+                            "refresh_token": "refresh_token",
+                            "access_token": "access_token",
                             "token_type": "bearer",
                         },
                     )
