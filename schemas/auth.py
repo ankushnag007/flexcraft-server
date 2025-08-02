@@ -1,6 +1,5 @@
 import re
-from datetime import datetime, timedelta, tzinfo
-from typing import Annotated, Dict, Literal, Optional, Union
+from typing import Annotated, Optional
 
 from bson import ObjectId
 from pydantic import (
@@ -13,8 +12,12 @@ from pydantic import (
 )
 
 from constants.common import Country, CountryCode, CountryTimezone, DefaultRoles
-from genric.datetime_helpers import get_current_utc_datetime
-from schemas.base_model import BasicFiledsCreate, BasicFiledsUpdate, GenricFiledsCreate
+from schemas.base_model import (
+    BasicFiledsCreate,
+    BasicFiledsUpdate,
+    GenricFiledsCreate,
+    PyObjectId,
+)
 
 
 class InitialUser(BasicFiledsCreate):
@@ -92,6 +95,7 @@ class User(BasicFiledsUpdate):
     password: Optional[SecretStr] = Field(..., min_length=6, max_length=25)
     first_name: Optional[str] = Field(..., min_length=2, max_length=50)
     last_name: Optional[str] = Field(None, min_length=2, max_length=50)
+    company_id: Optional[PyObjectId] = Field(None)
     role: Optional[DefaultRoles] = Field(DefaultRoles.USER)
     is_google_login: bool = False
     is_verified: bool = False
