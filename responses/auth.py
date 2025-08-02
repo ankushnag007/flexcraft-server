@@ -1,8 +1,8 @@
 import httpx
 from bson import ObjectId
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from jose import JWTError, jwt
+from jose import JWTError
 from pydantic import SecretStr
 from pymongo.errors import DuplicateKeyError
 from requests_oauthlib import OAuth2Session
@@ -27,7 +27,7 @@ from schemas.auth import (
 )
 from services.email import send_mail_html
 from utils.decorator import validate_token
-from utils.generate_unique_code import generate_invite_code, generate_unique_company_id
+from utils.generate_unique_code import generate_invite_code
 
 from . import company_collection, user_collection
 
@@ -353,7 +353,12 @@ class RegisterResponse:
 
 
 class LoginResponse:
-    async def create(self, login_dto: Login, request: Request):
+    async def create(
+        self,
+        login_dto: Login,
+        request: Request,
+        request_type: RequestMethod = RequestMethod.POST,
+    ):
         try:
             login_info_dict = login_dto.model_dump()
             user = user_collection.find_one({"email": login_info_dict["email"]})

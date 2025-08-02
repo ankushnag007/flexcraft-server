@@ -1,6 +1,4 @@
-from typing import Union
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from zstd_asgi import ZstdMiddleware
 
@@ -25,7 +23,7 @@ from schemas.auth import (
     RegisterUpdate,
     ResetPassword,
 )
-from schemas.project import Project
+from schemas.project import Project, ProjectUpdate
 
 #
 # App
@@ -176,12 +174,9 @@ app.include_router(
 app.include_router(
     generate_crud_routes(
         dto_create=Project,
+        dto_update=ProjectUpdate,
         response_model=ProjectResponse,
         prefix="/projects",
         tags=["Project"],
-        include_read=False,
-        include_read_all=False,
-        include_update=False,
-        include_delete=False,
     )
 )

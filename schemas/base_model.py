@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from bson import ObjectId
 from pydantic import (
@@ -51,7 +51,7 @@ class BasicFiledsUpdate(BaseModel):
 
     record_id: PyObjectId = Field(default=PyObjectId(ObjectId()))
     updated_at: datetime = Field(get_current_utc_datetime())
-    updated_by: PyObjectId = Field(...)
+    updated_by: Optional[PyObjectId] = Field(None)
 
     class Config:
         json_encoders = {
